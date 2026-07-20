@@ -1,6 +1,6 @@
 package com.example.vietaicoach.ui.model
 
 data class UiState(
-    val response: String = "No response",
+    val response: String = "",
     val errorMessage: String? = null
 )
