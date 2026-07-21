@@ -41,7 +41,7 @@ class ChatViewModelTest {
 
         viewModel.submitMessage("Test message")
 
-        viewModel.uiStateFlow.value.let { successResult ->
+        viewModel.responseStateFlow.value.let { successResult ->
             assert(successResult.response == "Success response")
             assertNull(successResult.errorMessage)
         }
@@ -53,7 +53,7 @@ class ChatViewModelTest {
 
         viewModel.submitMessage("Error message")
 
-        viewModel.uiStateFlow.value.let { errorResponse ->
+        viewModel.responseStateFlow.value.let { errorResponse ->
             assert(errorResponse.response.isEmpty())
             assertNotNull(errorResponse.errorMessage)
         }
