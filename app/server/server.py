@@ -1,8 +1,10 @@
 import os
 
-import anthropic
 from dotenv import load_dotenv
 from fastapi import FastAPI
+
+from app.server.claude_client import ClaudeClient
+from app.server.model.chat_request import ChatRequest, ChatResponse
 
 load_dotenv()
 api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -10,11 +12,11 @@ api_key = os.getenv("ANTHROPIC_API_KEY")
 if api_key is None:
     raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to your .env file.")
 
-client = anthropic.Anthropic()
+client = ClaudeClient(
+    api_key=api_key
+)
 app = FastAPI()
 
 @app.post("/chat")
-def test():
-    return {
-        "response": "This is a hardcoded response"
-    }
+def submitPrompt(request: ChatRequest) -> ChatResponse:
+    return ChatResponse(response=client.send(message=request.message))
