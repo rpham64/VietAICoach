@@ -4,19 +4,21 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.vietaicoach.data.ChatRepository
-import com.example.vietaicoach.data.ChatRepositoryImpl
+import com.example.vietaicoach.di.IOCoroutineDispatcher
 import com.example.vietaicoach.ui.model.ResponseState
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
-class ChatViewModel(
-    private val repository: ChatRepository = ChatRepositoryImpl(),
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+@HiltViewModel
+class ChatViewModel @Inject constructor(
+    private val repository: ChatRepository,
+    @IOCoroutineDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
     private val _promptStateFlow: MutableStateFlow<String> = MutableStateFlow("")
     val promptStateFlow: StateFlow<String> = _promptStateFlow.asStateFlow()
