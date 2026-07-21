@@ -1,8 +1,10 @@
 package com.example.vietaicoach.ui
 
+import android.content.ClipData
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,23 +17,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.vietaicoach.ui.model.ResponseState
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChatScreen(
@@ -60,23 +68,20 @@ fun ChatScreen(
     onSubmitButtonClicked: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scrollState = rememberScrollState()
-
     Column(
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = responseState.errorMessage ?: responseState.response,
-            modifier = Modifier
-                .verticalScroll(scrollState)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.Gray)
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(16.dp)
-        )
+        Box(
+            modifier = Modifier.fillMaxWidth().weight(1f)
+        ) {
+            ResponseText(responseState = responseState)
+            CopyButton(
+                responseState = responseState,
+                modifier = Modifier.align(Alignment.BottomEnd)
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -105,6 +110,53 @@ fun ChatScreen(
                 onSubmitButtonClicked = onSubmitButtonClicked
             )
         }
+    }
+}
+
+@Composable
+fun ResponseText(
+    responseState: ResponseState
+) {
+    val scrollState = rememberScrollState()
+
+    Text(
+        text = responseState.errorMessage ?: responseState.response,
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.Gray)
+            .padding(16.dp)
+            .verticalScroll(scrollState)
+    )
+}
+
+@Composable
+fun CopyButton(
+    responseState: ResponseState,
+    modifier: Modifier = Modifier
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val clipboard = LocalClipboard.current
+
+    IconButton(
+        onClick = {
+            coroutineScope.launch {
+                clipboard.setClipEntry(
+                    ClipEntry(
+                        ClipData.newPlainText(
+                            "response",
+                            responseState.errorMessage ?: responseState.response
+                        )
+                    )
+                )
+            }
+        },
+        modifier = modifier.padding(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.ContentCopy,
+            contentDescription = null,
+        )
     }
 }
 
