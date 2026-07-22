@@ -1,6 +1,7 @@
 package com.example.vietaicoach.ui
 
 import android.util.Log
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.vietaicoach.data.ChatRepository
@@ -20,15 +21,10 @@ class ChatViewModel @Inject constructor(
     private val repository: ChatRepository,
     @IOCoroutineDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
-    private val _promptStateFlow: MutableStateFlow<String> = MutableStateFlow("")
-    val promptStateFlow: StateFlow<String> = _promptStateFlow.asStateFlow()
+    val promptState: TextFieldState = TextFieldState()
 
     private val _responseStateFlow: MutableStateFlow<ResponseState> = MutableStateFlow(ResponseState())
     val responseStateFlow: StateFlow<ResponseState> = _responseStateFlow.asStateFlow()
-
-    fun updatePrompt(prompt: String) {
-        _promptStateFlow.value = prompt
-    }
 
     fun submitMessage(message: String) {
         viewModelScope.launch {

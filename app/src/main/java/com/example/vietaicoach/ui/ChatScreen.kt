@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
@@ -46,23 +49,20 @@ fun ChatScreen(
     modifier: Modifier = Modifier,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
-    val prompt by viewModel.promptStateFlow.collectAsStateWithLifecycle()
     val responseState by viewModel.responseStateFlow.collectAsStateWithLifecycle()
 
     ChatScreen(
-        prompt = prompt,
-        onPromptChanged = { newPrompt -> viewModel.updatePrompt(newPrompt) },
-        onClearClicked = { viewModel.updatePrompt("") },
+        promptState = viewModel.promptState,
+        onClearClicked = { viewModel.promptState.clearText() },
         responseState = responseState,
-        onSubmitButtonClicked = { viewModel.submitMessage(prompt) },
+        onSubmitButtonClicked = { viewModel.submitMessage(viewModel.promptState.text.toString()) },
         modifier = modifier
     )
 }
 
 @Composable
 fun ChatScreen(
-    prompt: String,
-    onPromptChanged: (String) -> Unit,
+    promptState: TextFieldState,
     onClearClicked: () -> Unit,
     responseState: ResponseState,
     onSubmitButtonClicked: () -> Unit,
@@ -90,8 +90,7 @@ fun ChatScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
-                value = prompt,
-                onValueChange = { newPrompt -> onPromptChanged(newPrompt) },
+                state = promptState,
                 trailingIcon = {
                     Icon(
                         imageVector = Icons.Default.Cancel,
@@ -189,8 +188,7 @@ fun SubmitButton(
 @Composable
 fun ChatScreenPreview() {
     ChatScreen(
-        prompt = "This is a test prompt",
-        onPromptChanged = { },
+        promptState = rememberTextFieldState(initialText = "This is a test prompt"),
         onClearClicked = { },
         responseState = ResponseState("Hello!"),
         onSubmitButtonClicked = { }
