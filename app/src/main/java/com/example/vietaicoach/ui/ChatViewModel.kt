@@ -4,11 +4,15 @@ import android.util.Log
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import com.example.vietaicoach.data.ChatRepository
+import com.example.vietaicoach.data.local.ChatMessageEntity
 import com.example.vietaicoach.di.IOCoroutineDispatcher
 import com.example.vietaicoach.ui.model.ResponseState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +29,8 @@ class ChatViewModel @Inject constructor(
 
     private val _responseStateFlow: MutableStateFlow<ResponseState> = MutableStateFlow(ResponseState())
     val responseStateFlow: StateFlow<ResponseState> = _responseStateFlow.asStateFlow()
+
+    val messages: Flow<PagingData<ChatMessageEntity>> = repository.getMessages().cachedIn(viewModelScope)
 
     fun submitMessage(message: String) {
         viewModelScope.launch {

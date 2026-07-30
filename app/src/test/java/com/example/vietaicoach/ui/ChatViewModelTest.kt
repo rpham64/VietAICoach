@@ -1,12 +1,17 @@
 package com.example.vietaicoach.ui
 
+import androidx.paging.PagingData
 import com.example.vietaicoach.data.ChatRepository
+import com.example.vietaicoach.data.local.ChatMessageEntity
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -27,6 +32,7 @@ class ChatViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(ioDispatcher)
+        every { repository.getMessages() } returns flowOf(PagingData.empty<ChatMessageEntity>())
         viewModel = ChatViewModel(repository, ioDispatcher)
     }
 
@@ -40,6 +46,7 @@ class ChatViewModelTest {
         coEvery { repository.submitMessage(any<String>()) } returns Result.success("Success response")
 
         viewModel.submitMessage("Test message")
+        advanceUntilIdle()
 
         viewModel.responseStateFlow.value.let { successResult ->
             assert(successResult.response == "Success response")
@@ -52,6 +59,7 @@ class ChatViewModelTest {
         coEvery { repository.submitMessage(any<String>()) } returns Result.failure(Throwable())
 
         viewModel.submitMessage("Error message")
+        advanceUntilIdle()
 
         viewModel.responseStateFlow.value.let { errorResponse ->
             assert(errorResponse.response.isEmpty())

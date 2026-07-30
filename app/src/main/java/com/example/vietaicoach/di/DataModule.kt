@@ -2,6 +2,8 @@ package com.example.vietaicoach.di
 
 import com.example.vietaicoach.data.ChatRepository
 import com.example.vietaicoach.data.ChatRepositoryImpl
+import com.example.vietaicoach.data.local.ChatLocalDataSource
+import com.example.vietaicoach.data.local.ChatLocalDataSourceImpl
 import com.example.vietaicoach.data.remote.ChatRemoteDataSource
 import com.example.vietaicoach.data.remote.ChatRemoteDataSourceImpl
 import dagger.Binds
@@ -21,4 +23,8 @@ abstract class DataModule {
     @Singleton
     @Binds
     abstract fun bindChatRemoteDataSource(chatRemoteDataSourceImpl: ChatRemoteDataSourceImpl): ChatRemoteDataSource
+
+    @Singleton
+    @Binds
+    abstract fun bindChatLocalDataSource(chatLocalDataSourceImpl: ChatLocalDataSourceImpl): ChatLocalDataSource
 }
