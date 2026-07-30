@@ -12,7 +12,7 @@ collection = chroma_client.get_or_create_collection(
     embedding_function=embedding_function
 )
 
-collection.add(
+collection.upsert(
     ids=[phrase.id for phrase in phrases],
     documents=[phrase.viet_phrase for phrase in phrases],
     metadatas=[

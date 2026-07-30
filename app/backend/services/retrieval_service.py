@@ -1,15 +1,14 @@
 from app.backend.db.chroma_client import collection
-from app.backend.services.embedding_service import EmbeddingService
+from app.backend.services.prompt_builder import PromptBuilder
 
 
 class RetrievalService:
     def __init__(self):
-        self.embedding_service = EmbeddingService()
+        self.prompt_builder = PromptBuilder()
 
-    def search(self, question) -> str:
-        embedding = self.embedding_service.embed(input=question)
+    def search(self, question: str) -> str:
         results = collection.query(
-            query_texts=[embedding],
+            query_texts=[question],
             n_results=3,
             include=[
                 "documents",
@@ -17,5 +16,7 @@ class RetrievalService:
                 "distances",
             ]
         )
+        documents = results["documents"][0]
+        prompt = self.prompt_builder.build_prompt(question, documents)
 
-        return results["documents"][0][0]
+        return prompt
