@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -111,7 +112,7 @@ fun ChatScreen(
                 trailingIcon = {
                     Icon(
                         imageVector = Icons.Default.Cancel,
-                        contentDescription = null,
+                        contentDescription = "Clear prompt",
                         modifier = Modifier.clickable {
                             onClearClicked()
                         }
@@ -215,7 +216,7 @@ fun CopyButton(
     ) {
         Icon(
             imageVector = Icons.Default.ContentCopy,
-            contentDescription = null,
+            contentDescription = "Copy response",
         )
     }
 }
@@ -234,7 +235,9 @@ fun SubmitButton(
             CircularProgressIndicator(
                 color = MaterialTheme.colorScheme.onPrimary,
                 strokeWidth = 2.dp,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier
+                    .size(20.dp)
+                    .testTag("SubmitButtonLoadingIndicator")
             )
         } else {
             Text(
