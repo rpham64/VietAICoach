@@ -1,7 +1,7 @@
 package com.example.vietaicoach.ui
 
-import android.util.Log
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
@@ -42,6 +42,7 @@ class ChatViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { message ->
+                    promptState.clearText()
                     _responseStateFlow.value = ResponseState(
                         response = message,
                         isLoading = false,
@@ -49,8 +50,6 @@ class ChatViewModel @Inject constructor(
                     )
                 },
                 onFailure = { error ->
-                    Log.e(TAG, "Error: $error")
-
                     _responseStateFlow.value = ResponseState(
                         response = responseStateFlow.value.response,
                         isLoading = false,

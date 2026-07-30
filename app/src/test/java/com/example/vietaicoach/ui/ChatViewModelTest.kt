@@ -1,5 +1,6 @@
 package com.example.vietaicoach.ui
 
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.paging.PagingData
 import com.example.vietaicoach.data.ChatRepository
 import com.example.vietaicoach.data.local.model.ChatMessageEntity
@@ -65,5 +66,27 @@ class ChatViewModelTest {
             assert(errorResponse.response.isEmpty())
             assertNotNull(errorResponse.errorMessage)
         }
+    }
+
+    @Test
+    fun `submitMessage clears the prompt when the response succeeds`() = runTest(ioDispatcher) {
+        coEvery { repository.submitMessage(any<String>()) } returns Result.success("Success response")
+        viewModel.promptState.setTextAndPlaceCursorAtEnd("Test message")
+
+        viewModel.submitMessage("Test message")
+        advanceUntilIdle()
+
+        assert(viewModel.promptState.text.isEmpty())
+    }
+
+    @Test
+    fun `submitMessage keeps the prompt text when the response fails`() = runTest(ioDispatcher) {
+        coEvery { repository.submitMessage(any<String>()) } returns Result.failure(Throwable())
+        viewModel.promptState.setTextAndPlaceCursorAtEnd("Error message")
+
+        viewModel.submitMessage("Error message")
+        advanceUntilIdle()
+
+        assert(viewModel.promptState.text.toString() == "Error message")
     }
 }
