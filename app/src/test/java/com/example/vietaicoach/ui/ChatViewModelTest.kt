@@ -2,7 +2,7 @@ package com.example.vietaicoach.ui
 
 import androidx.paging.PagingData
 import com.example.vietaicoach.data.ChatRepository
-import com.example.vietaicoach.data.local.ChatMessageEntity
+import com.example.vietaicoach.data.local.model.ChatMessageEntity
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk

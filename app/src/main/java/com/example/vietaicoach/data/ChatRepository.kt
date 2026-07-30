@@ -4,8 +4,8 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.example.vietaicoach.data.local.ChatLocalDataSource
-import com.example.vietaicoach.data.local.ChatMessageEntity
-import com.example.vietaicoach.data.local.ChatRole
+import com.example.vietaicoach.data.local.model.ChatMessageEntity
+import com.example.vietaicoach.data.local.model.ChatRole
 import com.example.vietaicoach.data.remote.ChatRemoteDataSource
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject

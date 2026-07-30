@@ -1,4 +1,4 @@
-package com.example.vietaicoach.data.local
+package com.example.vietaicoach.data.local.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

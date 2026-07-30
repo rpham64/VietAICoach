@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.example.vietaicoach.data.ChatRepository
-import com.example.vietaicoach.data.local.ChatMessageEntity
+import com.example.vietaicoach.data.local.model.ChatMessageEntity
 import com.example.vietaicoach.di.IOCoroutineDispatcher
 import com.example.vietaicoach.ui.model.ResponseState
 import dagger.hilt.android.lifecycle.HiltViewModel

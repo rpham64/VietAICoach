@@ -1,6 +1,8 @@
 package com.example.vietaicoach.data.local
 
 import androidx.paging.PagingSource
+import com.example.vietaicoach.data.local.model.ChatMessageEntity
+import com.example.vietaicoach.data.local.model.ChatRole
 import javax.inject.Inject
 
 interface ChatLocalDataSource {

@@ -45,8 +45,8 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import com.example.vietaicoach.data.local.ChatMessageEntity
-import com.example.vietaicoach.data.local.ChatRole
+import com.example.vietaicoach.data.local.model.ChatMessageEntity
+import com.example.vietaicoach.data.local.model.ChatRole
 import com.example.vietaicoach.ui.model.ResponseState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
