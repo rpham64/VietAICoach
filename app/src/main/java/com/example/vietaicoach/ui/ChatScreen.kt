@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
@@ -80,6 +82,9 @@ fun ChatScreen(
     onSubmitButtonClicked: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+
     Column(
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.Center,
@@ -88,7 +93,7 @@ fun ChatScreen(
         Box(
             modifier = Modifier.fillMaxWidth().weight(1f)
         ) {
-            MessageList(messages = messages, modifier = Modifier.fillMaxSize())
+            MessageList(messages = messages, listState = listState, modifier = Modifier.fillMaxSize())
             if (responseState.errorMessage != null) {
                 ErrorBanner(
                     errorMessage = responseState.errorMessage,
@@ -124,7 +129,10 @@ fun ChatScreen(
             )
             SubmitButton(
                 isLoading = responseState.isLoading,
-                onSubmitButtonClicked = onSubmitButtonClicked
+                onSubmitButtonClicked = {
+                    onSubmitButtonClicked()
+                    coroutineScope.launch { listState.animateScrollToItem(0) }
+                }
             )
         }
     }
@@ -133,10 +141,13 @@ fun ChatScreen(
 @Composable
 fun MessageList(
     messages: LazyPagingItems<ChatMessageEntity>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState()
 ) {
     LazyColumn(
+        state = listState,
         modifier = modifier
+            .testTag("MessageList")
             .clip(RoundedCornerShape(16.dp))
             .background(Color.LightGray),
         reverseLayout = true,

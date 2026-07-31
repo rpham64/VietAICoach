@@ -3,12 +3,14 @@ package com.example.vietaicoach.ui
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -111,6 +113,30 @@ class ChatScreenTest {
         composeTestRule.onNodeWithContentDescription("Clear prompt").performClick()
 
         assert(promptState.text.isEmpty())
+    }
+
+    @Test
+    fun submitButtonClickScrollsChatBackToTheBottom() {
+        val messages = (30 downTo 1).map { i ->
+            ChatMessageEntity(id = i.toLong(), role = ChatRole.USER, content = "Message $i", timestamp = i.toLong())
+        }.toTypedArray()
+
+        composeTestRule.setContent {
+            ChatScreen(
+                promptState = TextFieldState(),
+                onClearClicked = {},
+                responseState = ResponseState(),
+                messages = pagingItemsOf(*messages).collectAsLazyPagingItems(),
+                onSubmitButtonClicked = {}
+            )
+        }
+
+        composeTestRule.onNodeWithTag("MessageList").performScrollToIndex(25)
+        composeTestRule.onNodeWithText("Message 30").assertIsNotDisplayed()
+
+        composeTestRule.onNodeWithText("Submit").performClick()
+
+        composeTestRule.onNodeWithText("Message 30").assertIsDisplayed()
     }
 
     @Test
