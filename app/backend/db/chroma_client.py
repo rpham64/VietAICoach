@@ -1,7 +1,7 @@
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
-from app.backend.models.phrase import phrases
+from app.backend.models.phrases import phrases
 
 chroma_client = chromadb.PersistentClient()
 embedding_function = SentenceTransformerEmbeddingFunction(
