@@ -98,6 +98,36 @@ class ChatScreenTest {
     }
 
     @Test
+    fun displaysTypingIndicatorWhileWaitingForAResponse() {
+        composeTestRule.setContent {
+            ChatScreen(
+                promptState = TextFieldState(),
+                onClearClicked = {},
+                responseState = ResponseState(isLoading = true),
+                messages = pagingItemsOf().collectAsLazyPagingItems(),
+                onSubmitButtonClicked = {}
+            )
+        }
+
+        composeTestRule.onNodeWithTag("TypingIndicator").assertIsDisplayed()
+    }
+
+    @Test
+    fun doesNotDisplayTypingIndicatorWhenNotLoading() {
+        composeTestRule.setContent {
+            ChatScreen(
+                promptState = TextFieldState(),
+                onClearClicked = {},
+                responseState = ResponseState(),
+                messages = pagingItemsOf().collectAsLazyPagingItems(),
+                onSubmitButtonClicked = {}
+            )
+        }
+
+        composeTestRule.onNodeWithTag("TypingIndicator").assertDoesNotExist()
+    }
+
+    @Test
     fun clearIconClickInvokesCallback() {
         val promptState = TextFieldState(initialText = "Hello")
         composeTestRule.setContent {

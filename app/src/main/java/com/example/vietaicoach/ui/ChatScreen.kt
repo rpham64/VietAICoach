@@ -1,6 +1,12 @@
 package com.example.vietaicoach.ui
 
 import android.content.ClipData
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
@@ -35,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipEntry
@@ -93,7 +101,12 @@ fun ChatScreen(
         Box(
             modifier = Modifier.fillMaxWidth().weight(1f)
         ) {
-            MessageList(messages = messages, listState = listState, modifier = Modifier.fillMaxSize())
+            MessageList(
+                messages = messages,
+                isAssistantTyping = responseState.isLoading,
+                listState = listState,
+                modifier = Modifier.fillMaxSize()
+            )
             if (responseState.errorMessage != null) {
                 ErrorBanner(
                     errorMessage = responseState.errorMessage,
@@ -141,6 +154,7 @@ fun ChatScreen(
 @Composable
 fun MessageList(
     messages: LazyPagingItems<ChatMessageEntity>,
+    isAssistantTyping: Boolean = false,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState()
 ) {
@@ -154,6 +168,11 @@ fun MessageList(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        if (isAssistantTyping) {
+            item(key = "typing-indicator") {
+                TypingIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        }
         items(
             count = messages.itemCount,
             key = messages.itemKey { it.id }
@@ -184,6 +203,43 @@ fun MessageBubble(
                 .background(if (isUser) MaterialTheme.colorScheme.primaryContainer else Color.White)
                 .padding(12.dp)
         )
+    }
+}
+
+@Composable
+fun TypingIndicator(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Row(
+            modifier = Modifier
+                .testTag("TypingIndicator")
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val transition = rememberInfiniteTransition(label = "typingIndicator")
+            repeat(3) { index ->
+                val alpha by transition.animateFloat(
+                    initialValue = 0.3f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 600, delayMillis = index * 150, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "typingIndicatorDot$index"
+                )
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .alpha(alpha)
+                        .clip(CircleShape)
+                        .background(Color.DarkGray)
+                )
+            }
+        }
     }
 }
 
@@ -275,6 +331,26 @@ fun ChatScreenPreview() {
         promptState = rememberTextFieldState(initialText = "This is a test prompt"),
         onClearClicked = { },
         responseState = ResponseState("Hello!"),
+        messages = previewMessages.collectAsLazyPagingItems(),
+        onSubmitButtonClicked = { }
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ChatScreenTypingIndicatorPreview() {
+    val previewMessages: Flow<PagingData<ChatMessageEntity>> = flowOf(
+        PagingData.from(
+            listOf(
+                ChatMessageEntity(id = 1, role = ChatRole.USER, content = "This is a test prompt", timestamp = 1L)
+            )
+        )
+    )
+
+    ChatScreen(
+        promptState = rememberTextFieldState(),
+        onClearClicked = { },
+        responseState = ResponseState(isLoading = true),
         messages = previewMessages.collectAsLazyPagingItems(),
         onSubmitButtonClicked = { }
     )
