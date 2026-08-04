@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Charcoal. One per-config color keeps themes.xml free of a night variant. -->
+    <color name="splash_background">#232120</color>
+    <color name="lacquer_red">#D9614F</color>
+    <color name="rice_gold">#E8BE55</color>
+    <color name="splash_emblem_disc">#232120</color>
+</resources>

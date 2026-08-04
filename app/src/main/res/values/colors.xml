@@ -7,4 +7,10 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Brand. Mirrors ui/theme/Color.kt; values-night swaps splash_background. -->
+    <color name="splash_background">#F8F4EC</color>
+    <color name="lacquer_red">#B53A2E</color>
+    <color name="rice_gold">#D9A625</color>
+    <color name="splash_emblem_disc">#FFFFFF</color>
 </resources>

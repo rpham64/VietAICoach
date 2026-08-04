@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  System-splash counterpart to the Compose emblem in ui/SplashScreen.kt: the disc and its gold
+  tone mark only. The lacquer red comes from windowSplashScreenIconBackgroundColor, which the
+  platform masks to a circle on API 31+, so the glyph stays inside the inner 72dp safe zone.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Disc — 34/92 of the emblem, centred. -->
+    <path
+        android:fillColor="@color/splash_emblem_disc"
+        android:pathData="M54,54 m-13.3,0 a13.3,13.3 0 1,0 26.6,0 a13.3,13.3 0 1,0 -26.6,0" />
+
+    <!-- Tone mark (dấu sắc) — a pill overhanging the disc, tilted 20°. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="39.2"
+        android:rotation="20">
+        <path
+            android:fillColor="@color/rice_gold"
+            android:pathData="M51.65,36.05 A2.35,2.35 0 0 1 56.35,36.05 L56.35,42.35 A2.35,2.35 0 0 1 51.65,42.35 Z" />
+    </group>
+</vector>

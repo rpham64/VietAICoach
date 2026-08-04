@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.VietAICoach" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      windowBackground is what actually removes the cold-start flash: it is the colour the window
+      shows before Compose draws its first frame, so it must match the splash background.
+    -->
+    <style name="Theme.VietAICoach" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+
+    <!-- Launch theme. Hands off to Theme.VietAICoach once the activity is up. -->
+    <style name="Theme.VietAICoach.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/lacquer_red</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_emblem</item>
+        <item name="postSplashScreenTheme">@style/Theme.VietAICoach</item>
+    </style>
 </resources>
