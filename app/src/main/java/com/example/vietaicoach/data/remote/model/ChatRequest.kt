@@ -1,8 +1,10 @@
 package com.example.vietaicoach.data.remote.model
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class ChatRequest(
-    @SerializedName("prompt")
+    @SerialName("prompt")
     val prompt: String
 )
