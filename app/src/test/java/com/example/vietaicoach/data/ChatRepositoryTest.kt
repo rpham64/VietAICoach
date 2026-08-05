@@ -16,6 +16,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,25 +26,32 @@ class ChatRepositoryTest {
     private val localDataSource: ChatLocalDataSource = mockk()
     private val repository: ChatRepository = ChatRepositoryImpl(remoteDataSource, localDataSource)
 
-    @Test
-    fun `submitMessage saves the user message before calling the remote data source`() = runTest {
-        coEvery { localDataSource.saveUserMessage(any(), any()) } returns 1L
-        coEvery { localDataSource.saveAssistantMessage(any(), any(), any(), any(), any(), any()) } returns 2L
-        coEvery { remoteDataSource.submitMessage("Hello") } returns
-            Result.success(ChatResponse(response = "Hi!"))
-
-        repository.submitMessage("Hello")
-
-        coVerifyOrder {
-            localDataSource.saveUserMessage("Hello", DeliveryStatus.SENT)
-            remoteDataSource.submitMessage("Hello")
-        }
+    private fun stubLocalWrites(userMessageId: Long = 1L) {
+        coEvery { localDataSource.saveUserMessage(any(), any()) } returns userMessageId
+        coEvery {
+            localDataSource.saveAssistantMessage(any(), any(), any(), any(), any(), any())
+        } returns 2L
+        coEvery { localDataSource.updateDeliveryStatus(any(), any()) } returns Unit
     }
 
     @Test
-    fun `submitMessage saves and returns the assistant response on success`() = runTest {
-        coEvery { localDataSource.saveUserMessage(any(), any()) } returns 1L
-        coEvery { localDataSource.saveAssistantMessage(any(), any(), any(), any(), any(), any()) } returns 2L
+    fun `submitMessage writes the user bubble as SENDING before calling the remote data source`() =
+        runTest {
+            stubLocalWrites()
+            coEvery { remoteDataSource.submitMessage("Hello") } returns
+                Result.success(ChatResponse(response = "Hi!"))
+
+            repository.submitMessage("Hello")
+
+            coVerifyOrder {
+                localDataSource.saveUserMessage("Hello", DeliveryStatus.SENDING)
+                remoteDataSource.submitMessage("Hello")
+            }
+        }
+
+    @Test
+    fun `submitMessage settles the user bubble to SENT and saves the reply on success`() = runTest {
+        stubLocalWrites(userMessageId = 42L)
         coEvery { remoteDataSource.submitMessage("Hello") } returns
             Result.success(ChatResponse(response = "Hi!"))
 
@@ -51,13 +59,13 @@ class ChatRepositoryTest {
 
         assertTrue(result.isSuccess)
         assertEquals("Hi!", result.getOrNull())
+        coVerify { localDataSource.updateDeliveryStatus(42L, DeliveryStatus.SENT) }
         coVerify { localDataSource.saveAssistantMessage("Hi!", null, null, null, null, false) }
     }
 
     @Test
     fun `submitMessage persists the coaching annotations that came back with the reply`() = runTest {
-        coEvery { localDataSource.saveUserMessage(any(), any()) } returns 1L
-        coEvery { localDataSource.saveAssistantMessage(any(), any(), any(), any(), any(), any()) } returns 2L
+        stubLocalWrites()
         coEvery { remoteDataSource.submitMessage("Hello") } returns Result.success(
             ChatResponse(
                 response = "Giỏi lắm!",
@@ -85,19 +93,84 @@ class ChatRepositoryTest {
     }
 
     @Test
-    fun `submitMessage does not save an assistant message when the remote call fails`() = runTest {
-        val error = RuntimeException("Network error")
-        coEvery { localDataSource.saveUserMessage(any(), any()) } returns 1L
-        coEvery { remoteDataSource.submitMessage("Hello") } returns Result.failure(error)
+    fun `submitMessage marks the user bubble FAILED and saves no reply when the remote call fails`() =
+        runTest {
+            val error = RuntimeException("Network error")
+            stubLocalWrites(userMessageId = 42L)
+            coEvery { remoteDataSource.submitMessage("Hello") } returns Result.failure(error)
 
-        val result = repository.submitMessage("Hello")
+            val result = repository.submitMessage("Hello")
+
+            assertTrue(result.isFailure)
+            assertEquals(error, result.exceptionOrNull())
+            coVerify { localDataSource.updateDeliveryStatus(42L, DeliveryStatus.FAILED) }
+            coVerify(exactly = 0) {
+                localDataSource.saveAssistantMessage(any(), any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `retryMessage re-sends the stored content and settles the existing bubble`() = runTest {
+        stubLocalWrites()
+        coEvery { localDataSource.getMessage(42L) } returns ChatMessageEntity(
+            id = 42L,
+            role = ChatRole.USER,
+            content = "Hôm qua tôi đã đi đến chợ.",
+            timestamp = 1L,
+            deliveryStatus = DeliveryStatus.FAILED
+        )
+        coEvery { remoteDataSource.submitMessage("Hôm qua tôi đã đi đến chợ.") } returns
+            Result.success(ChatResponse(response = "Giỏi lắm!"))
+
+        val result = repository.retryMessage(42L)
+
+        assertEquals("Giỏi lắm!", result.getOrNull())
+        // The bubble is reused, not duplicated.
+        coVerify(exactly = 0) { localDataSource.saveUserMessage(any(), any()) }
+        coVerifyOrder {
+            localDataSource.updateDeliveryStatus(42L, DeliveryStatus.SENDING)
+            remoteDataSource.submitMessage("Hôm qua tôi đã đi đến chợ.")
+            localDataSource.updateDeliveryStatus(42L, DeliveryStatus.SENT)
+        }
+    }
+
+    @Test
+    fun `retryMessage returns the bubble to FAILED when the retry also fails`() = runTest {
+        stubLocalWrites()
+        coEvery { localDataSource.getMessage(42L) } returns ChatMessageEntity(
+            id = 42L,
+            role = ChatRole.USER,
+            content = "Xin chào",
+            timestamp = 1L,
+            deliveryStatus = DeliveryStatus.FAILED
+        )
+        coEvery { remoteDataSource.submitMessage("Xin chào") } returns
+            Result.failure(RuntimeException("Still offline"))
+
+        val result = repository.retryMessage(42L)
 
         assertTrue(result.isFailure)
-        assertEquals(error, result.exceptionOrNull())
-        coVerify(exactly = 1) { localDataSource.saveUserMessage(any(), any()) }
-        coVerify(exactly = 0) {
-            localDataSource.saveAssistantMessage(any(), any(), any(), any(), any(), any())
-        }
+        coVerify { localDataSource.updateDeliveryStatus(42L, DeliveryStatus.FAILED) }
+    }
+
+    @Test
+    fun `retryMessage fails without touching the network when the message is gone`() = runTest {
+        coEvery { localDataSource.getMessage(404L) } returns null
+
+        val result = repository.retryMessage(404L)
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        coVerify(exactly = 0) { remoteDataSource.submitMessage(any()) }
+    }
+
+    @Test
+    fun `hasNoMessages reflects whether local history is empty`() = runTest {
+        coEvery { localDataSource.isEmpty() } returns true
+        assertTrue(repository.hasNoMessages())
+
+        coEvery { localDataSource.isEmpty() } returns false
+        assertFalse(repository.hasNoMessages())
     }
 
     @Test
