@@ -24,6 +24,14 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Room exports each schema version here so MigrationTestHelper can verify migrations.
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+    sourceSets {
+        getByName("androidTest").assets.directories.add("$projectDir/schemas")
+    }
+
     buildTypes {
         release {
             optimization {
@@ -65,6 +73,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.paging)
     testImplementation(libs.junit.jupiter)
+    androidTestImplementation(libs.androidx.room.testing)
     ksp(libs.androidx.room.compiler)
 
     // Paging
