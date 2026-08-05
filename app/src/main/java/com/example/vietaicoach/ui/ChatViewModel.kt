@@ -9,13 +9,14 @@ import androidx.paging.cachedIn
 import com.example.vietaicoach.data.ChatRepository
 import com.example.vietaicoach.data.local.model.ChatMessageEntity
 import com.example.vietaicoach.di.IOCoroutineDispatcher
-import com.example.vietaicoach.ui.model.ResponseState
+import com.example.vietaicoach.ui.model.ChatUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -25,42 +26,51 @@ class ChatViewModel @Inject constructor(
     private val repository: ChatRepository,
     @IOCoroutineDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ViewModel() {
+
     val promptState: TextFieldState = TextFieldState()
 
-    private val _responseStateFlow: MutableStateFlow<ResponseState> = MutableStateFlow(ResponseState())
-    val responseStateFlow: StateFlow<ResponseState> = _responseStateFlow.asStateFlow()
+    private val _uiState = MutableStateFlow(ChatUiState())
+    val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
-    val messages: Flow<PagingData<ChatMessageEntity>> = repository.getMessages().cachedIn(viewModelScope)
+    val messages: Flow<PagingData<ChatMessageEntity>> =
+        repository.getMessages().cachedIn(viewModelScope)
 
-    fun submitMessage(message: String) {
+    init {
         viewModelScope.launch {
-            _responseStateFlow.value = responseStateFlow.value.copy(isLoading = true)
-
-            val result = withContext(ioDispatcher) {
-                repository.submitMessage(message)
-            }
-
-            result.fold(
-                onSuccess = { message ->
-                    promptState.clearText()
-                    _responseStateFlow.value = ResponseState(
-                        response = message,
-                        isLoading = false,
-                        errorMessage = null
-                    )
-                },
-                onFailure = { error ->
-                    _responseStateFlow.value = ResponseState(
-                        response = responseStateFlow.value.response,
-                        isLoading = false,
-                        errorMessage = error.message.toString()
-                    )
-                }
-            )
+            // Only the very first paint shows the skeleton; cached history paints immediately.
+            val isEmpty = withContext(ioDispatcher) { repository.hasNoMessages() }
+            _uiState.update { it.copy(isInitialLoading = isEmpty) }
         }
     }
 
-    companion object {
-        private const val TAG = "ChatViewModel"
+    /** Called once the paging source reports its first page, clearing the skeleton. */
+    fun onMessagesLoaded() {
+        _uiState.update { it.copy(isInitialLoading = false) }
+    }
+
+    fun submitMessage(message: String) {
+        if (message.isBlank()) return
+        // Cleared up front: the message is already on screen as its own bubble, so leaving it in
+        // the composer would show it twice.
+        promptState.clearText()
+        dispatch { repository.submitMessage(message) }
+    }
+
+    fun retryMessage(messageId: Long) {
+        dispatch { repository.retryMessage(messageId) }
+    }
+
+    /**
+     * A failure needs no state of its own — the repository has already marked the message
+     * FAILED, and the list renders that. All this has to do is stop the typing indicator.
+     */
+    private fun dispatch(block: suspend () -> Result<String>) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAwaitingReply = true) }
+
+            withContext(ioDispatcher) { block() }
+
+            _uiState.update { it.copy(isInitialLoading = false, isAwaitingReply = false) }
+        }
     }
 }

@@ -16,7 +16,7 @@ import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.vietaicoach.data.local.model.ChatMessageEntity
 import com.example.vietaicoach.data.local.model.ChatRole
-import com.example.vietaicoach.ui.model.ResponseState
+import com.example.vietaicoach.ui.model.ChatUiState
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Rule
 import org.junit.Test
@@ -35,7 +35,7 @@ class ChatScreenTest {
             ChatScreen(
                 promptState = TextFieldState(),
                 onClearClicked = {},
-                responseState = ResponseState(),
+                uiState = ChatUiState(isInitialLoading = false),
                 messages = pagingItemsOf(
                     ChatMessageEntity(id = 1, role = ChatRole.USER, content = "Hi there", timestamp = 1L),
                     ChatMessageEntity(id = 2, role = ChatRole.ASSISTANT, content = "Hello!", timestamp = 2L)
@@ -49,28 +49,13 @@ class ChatScreenTest {
     }
 
     @Test
-    fun displaysErrorBannerWhenResponseStateHasAnError() {
-        composeTestRule.setContent {
-            ChatScreen(
-                promptState = TextFieldState(),
-                onClearClicked = {},
-                responseState = ResponseState(errorMessage = "Something went wrong"),
-                messages = pagingItemsOf().collectAsLazyPagingItems(),
-                onSubmitButtonClicked = {}
-            )
-        }
-
-        composeTestRule.onNodeWithText("Something went wrong").assertIsDisplayed()
-    }
-
-    @Test
     fun submitButtonClickInvokesCallback() {
         var submitted = false
         composeTestRule.setContent {
             ChatScreen(
                 promptState = TextFieldState(),
                 onClearClicked = {},
-                responseState = ResponseState(),
+                uiState = ChatUiState(isInitialLoading = false),
                 messages = pagingItemsOf().collectAsLazyPagingItems(),
                 onSubmitButtonClicked = { submitted = true }
             )
@@ -87,7 +72,7 @@ class ChatScreenTest {
             ChatScreen(
                 promptState = TextFieldState(),
                 onClearClicked = {},
-                responseState = ResponseState(isLoading = true),
+                uiState = ChatUiState(isInitialLoading = false, isAwaitingReply = true),
                 messages = pagingItemsOf().collectAsLazyPagingItems(),
                 onSubmitButtonClicked = {}
             )
@@ -103,7 +88,7 @@ class ChatScreenTest {
             ChatScreen(
                 promptState = TextFieldState(),
                 onClearClicked = {},
-                responseState = ResponseState(isLoading = true),
+                uiState = ChatUiState(isInitialLoading = false, isAwaitingReply = true),
                 messages = pagingItemsOf().collectAsLazyPagingItems(),
                 onSubmitButtonClicked = {}
             )
@@ -118,7 +103,7 @@ class ChatScreenTest {
             ChatScreen(
                 promptState = TextFieldState(),
                 onClearClicked = {},
-                responseState = ResponseState(),
+                uiState = ChatUiState(isInitialLoading = false),
                 messages = pagingItemsOf().collectAsLazyPagingItems(),
                 onSubmitButtonClicked = {}
             )
@@ -134,7 +119,7 @@ class ChatScreenTest {
             ChatScreen(
                 promptState = promptState,
                 onClearClicked = { promptState.clearText() },
-                responseState = ResponseState(),
+                uiState = ChatUiState(isInitialLoading = false),
                 messages = pagingItemsOf().collectAsLazyPagingItems(),
                 onSubmitButtonClicked = {}
             )
@@ -155,7 +140,7 @@ class ChatScreenTest {
             ChatScreen(
                 promptState = TextFieldState(),
                 onClearClicked = {},
-                responseState = ResponseState(),
+                uiState = ChatUiState(isInitialLoading = false),
                 messages = pagingItemsOf(*messages).collectAsLazyPagingItems(),
                 onSubmitButtonClicked = {}
             )
@@ -176,7 +161,7 @@ class ChatScreenTest {
             ChatScreen(
                 promptState = promptState,
                 onClearClicked = {},
-                responseState = ResponseState(),
+                uiState = ChatUiState(isInitialLoading = false),
                 messages = pagingItemsOf().collectAsLazyPagingItems(),
                 onSubmitButtonClicked = {}
             )
