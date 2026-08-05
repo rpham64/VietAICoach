@@ -5,6 +5,7 @@ import androidx.paging.PagingData
 import com.example.vietaicoach.data.ChatRepository
 import com.example.vietaicoach.data.local.model.ChatMessageEntity
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
@@ -17,24 +18,22 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.junit.jupiter.api.assertNotNull
-import org.junit.jupiter.api.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
 
-    private val repository: ChatRepository = mockk<ChatRepository>()
+    private val repository: ChatRepository = mockk()
     private val ioDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher()
-
-    private lateinit var viewModel: ChatViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(ioDispatcher)
         every { repository.getMessages() } returns flowOf(PagingData.empty<ChatMessageEntity>())
-        viewModel = ChatViewModel(repository, ioDispatcher)
+        coEvery { repository.hasNoMessages() } returns false
     }
 
     @After
@@ -42,51 +41,110 @@ class ChatViewModelTest {
         Dispatchers.resetMain()
     }
 
-    @Test
-    fun `submitMessage submits message and gets success response`() = runTest(ioDispatcher) {
-        coEvery { repository.submitMessage(any<String>()) } returns Result.success("Success response")
+    private fun viewModel() = ChatViewModel(repository, ioDispatcher)
 
-        viewModel.submitMessage("Test message")
+    @Test
+    fun `starts in the loading state when there is no local history`() = runTest(ioDispatcher) {
+        coEvery { repository.hasNoMessages() } returns true
+
+        val viewModel = viewModel()
         advanceUntilIdle()
 
-        viewModel.responseStateFlow.value.let { successResult ->
-            assert(successResult.response == "Success response")
-            assertNull(successResult.errorMessage)
-        }
+        assertTrue(viewModel.uiState.value.isInitialLoading)
     }
 
     @Test
-    fun `submitMessage submits message and gets error response`() = runTest(ioDispatcher) {
-        coEvery { repository.submitMessage(any<String>()) } returns Result.failure(Throwable())
+    fun `skips the skeleton when local history is already cached`() = runTest(ioDispatcher) {
+        coEvery { repository.hasNoMessages() } returns false
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isInitialLoading)
+    }
+
+    @Test
+    fun `onMessagesLoaded clears the skeleton`() = runTest(ioDispatcher) {
+        coEvery { repository.hasNoMessages() } returns true
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.onMessagesLoaded()
+
+        assertFalse(viewModel.uiState.value.isInitialLoading)
+    }
+
+    @Test
+    fun `submitMessage awaits a reply and settles once the repository responds`() =
+        runTest(ioDispatcher) {
+            coEvery { repository.submitMessage(any()) } returns Result.success("Success response")
+            val viewModel = viewModel()
+
+            viewModel.submitMessage("Test message")
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.isAwaitingReply)
+            coVerify { repository.submitMessage("Test message") }
+        }
+
+    @Test
+    fun `submitMessage stops awaiting a reply when the send fails`() = runTest(ioDispatcher) {
+        coEvery { repository.submitMessage(any()) } returns Result.failure(Throwable())
+        val viewModel = viewModel()
 
         viewModel.submitMessage("Error message")
         advanceUntilIdle()
 
-        viewModel.responseStateFlow.value.let { errorResponse ->
-            assert(errorResponse.response.isEmpty())
-            assertNotNull(errorResponse.errorMessage)
-        }
+        // Failure is rendered inline on the message itself, so there is no screen-level
+        // error state to assert — only that the typing indicator stops.
+        assertFalse(viewModel.uiState.value.isAwaitingReply)
     }
 
     @Test
-    fun `submitMessage clears the prompt when the response succeeds`() = runTest(ioDispatcher) {
-        coEvery { repository.submitMessage(any<String>()) } returns Result.success("Success response")
+    fun `submitMessage clears the prompt so the text is not shown twice`() = runTest(ioDispatcher) {
+        coEvery { repository.submitMessage(any()) } returns Result.success("Success response")
+        val viewModel = viewModel()
         viewModel.promptState.setTextAndPlaceCursorAtEnd("Test message")
 
         viewModel.submitMessage("Test message")
         advanceUntilIdle()
 
-        assert(viewModel.promptState.text.isEmpty())
+        assertTrue(viewModel.promptState.text.isEmpty())
     }
 
     @Test
-    fun `submitMessage keeps the prompt text when the response fails`() = runTest(ioDispatcher) {
-        coEvery { repository.submitMessage(any<String>()) } returns Result.failure(Throwable())
+    fun `submitMessage clears the prompt even when the send fails`() = runTest(ioDispatcher) {
+        coEvery { repository.submitMessage(any()) } returns Result.failure(Throwable())
+        val viewModel = viewModel()
         viewModel.promptState.setTextAndPlaceCursorAtEnd("Error message")
 
         viewModel.submitMessage("Error message")
         advanceUntilIdle()
 
-        assert(viewModel.promptState.text.toString() == "Error message")
+        // The message is already on screen as a FAILED bubble with its own Retry affordance,
+        // so leaving the text in the composer would duplicate it.
+        assertTrue(viewModel.promptState.text.isEmpty())
+    }
+
+    @Test
+    fun `submitMessage ignores a blank prompt`() = runTest(ioDispatcher) {
+        val viewModel = viewModel()
+
+        viewModel.submitMessage("   ")
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { repository.submitMessage(any()) }
+    }
+
+    @Test
+    fun `retryMessage delegates to the repository`() = runTest(ioDispatcher) {
+        coEvery { repository.retryMessage(42L) } returns Result.success("Success response")
+        val viewModel = viewModel()
+
+        viewModel.retryMessage(42L)
+        advanceUntilIdle()
+
+        coVerify { repository.retryMessage(42L) }
+        assertFalse(viewModel.uiState.value.isAwaitingReply)
     }
 }
