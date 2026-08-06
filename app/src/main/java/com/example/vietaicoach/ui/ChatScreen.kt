@@ -2,8 +2,10 @@ package com.example.vietaicoach.ui
 
 import android.content.ClipData
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -41,6 +44,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -60,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -98,6 +103,7 @@ fun ChatScreen(
         uiState = uiState,
         messages = messages,
         onSubmitMessage = { viewModel.submitMessage(viewModel.promptState.text.toString()) },
+        onMessagesLoaded = viewModel::onMessagesLoaded,
         modifier = modifier
     )
 }
@@ -108,34 +114,58 @@ fun ChatScreen(
     uiState: ChatUiState,
     messages: LazyPagingItems<ChatMessageEntity>,
     onSubmitMessage: () -> Unit,
+    onMessagesLoaded: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+
+    val refreshState = messages.loadState.refresh
+    // In a LaunchedEffect, not the composition body: writing state while composing would
+    // schedule another composition that writes it again.
+    LaunchedEffect(refreshState) {
+        if (refreshState is LoadState.NotLoading) onMessagesLoaded()
+    }
+    // The ViewModel owns this decision — it seeds the flag from whether history is empty and
+    // clears it above. Also reading LoadState here would double-count the first frame, where
+    // refresh is still Loading even though there is cached history to paint.
+    val showSkeleton = uiState.isInitialLoading
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        ChatHeader(dialect = uiState.dialect)
+        ChatHeader(dialect = uiState.dialect, isLoading = showSkeleton)
 
-        MessageList(
-            messages = messages,
-            isAssistantTyping = uiState.isAwaitingReply,
-            listState = listState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        )
+        if (showSkeleton) {
+            MessageListSkeleton(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+        } else {
+            MessageList(
+                messages = messages,
+                isAssistantTyping = uiState.isAwaitingReply,
+                listState = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+        }
 
-        MessageComposer(
-            promptState = promptState,
-            onSubmitMessage = {
-                onSubmitMessage()
-                coroutineScope.launch { listState.animateScrollToItem(0) }
-            }
-        )
+        if (showSkeleton) {
+            ComposerSkeleton()
+        } else {
+            MessageComposer(
+                promptState = promptState,
+                onSubmitMessage = {
+                    onSubmitMessage()
+                    coroutineScope.launch { listState.animateScrollToItem(0) }
+                }
+            )
+        }
     }
 }
 
@@ -148,6 +178,7 @@ fun ChatScreen(
 @Composable
 private fun ChatHeader(
     dialect: String,
+    isLoading: Boolean,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -180,7 +211,7 @@ private fun ChatHeader(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Practicing · $dialect dialect",
+                text = if (isLoading) "Loading conversation…" else "Practicing · $dialect dialect",
                 fontSize = 11.5.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -437,6 +468,104 @@ fun TypingIndicator(modifier: Modifier = Modifier) {
     }
 }
 
+/* ------------------------------------------------------------------ skeleton */
+
+/**
+ * First-load placeholder (frames 2a/2d). The bars pulse on a 150ms cascade rather than in
+ * unison — the stagger is what reads as "loading" instead of "broken".
+ */
+@Composable
+fun MessageListSkeleton(modifier: Modifier = Modifier) {
+    val coach = LocalCoachColors.current
+    val transition = rememberInfiniteTransition(label = "skeleton")
+
+    Column(
+        modifier = modifier
+            .testTag("MessageListSkeleton")
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        SkeletonBubbles.forEachIndexed { index, bubble ->
+            val alpha by transition.animateFloat(
+                initialValue = SKELETON_MIN_ALPHA,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(
+                        durationMillis = SKELETON_HALF_CYCLE_MS,
+                        easing = FastOutSlowInEasing
+                    ),
+                    repeatMode = RepeatMode.Reverse,
+                    // Offsets the phase; delayMillis would re-apply on every cycle.
+                    initialStartOffset = StartOffset(index * SKELETON_STAGGER_MS)
+                ),
+                label = "skeletonAlpha$index"
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = bubble.arrangement
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(bubble.widthFraction)
+                        .height(bubble.height)
+                        .alpha(alpha)
+                        .clip(bubble.shape)
+                        .background(coach.skeleton)
+                )
+            }
+        }
+    }
+}
+
+/** The composer keeps its geometry while loading but goes flat and, unlike the bars, still. */
+@Composable
+private fun ComposerSkeleton(modifier: Modifier = Modifier) {
+    val coach = LocalCoachColors.current
+
+    Row(
+        modifier = modifier
+            .testTag("ComposerSkeleton")
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(42.dp)
+                .clip(ComposerFieldShape)
+                .background(coach.skeleton)
+        )
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(coach.skeleton)
+        )
+    }
+}
+
+private class SkeletonBubble(
+    val widthFraction: Float,
+    val height: Dp,
+    val arrangement: Arrangement.Horizontal,
+    val shape: RoundedCornerShape
+)
+
+private val SkeletonBubbles = listOf(
+    SkeletonBubble(0.70f, 38.dp, Arrangement.Start, AssistantBubbleShape),
+    SkeletonBubble(0.50f, 32.dp, Arrangement.End, UserBubbleShape),
+    SkeletonBubble(0.82f, 52.dp, Arrangement.Start, AssistantBubbleShape),
+    SkeletonBubble(0.38f, 32.dp, Arrangement.End, UserBubbleShape)
+)
+
+private const val SKELETON_MIN_ALPHA = 0.55f
+private const val SKELETON_HALF_CYCLE_MS = 700
+private const val SKELETON_STAGGER_MS = 150
+
 /* ------------------------------------------------------------------ composer */
 
 @Composable
@@ -578,7 +707,8 @@ private fun PreviewChat(
             promptState = rememberTextFieldState(),
             uiState = uiState,
             messages = flow.collectAsLazyPagingItems(),
-            onSubmitMessage = { }
+            onSubmitMessage = { },
+            onMessagesLoaded = { }
         )
     }
 }
@@ -604,3 +734,18 @@ private fun ChatScreenSuccessDarkPreview() =
 private fun ChatScreenTypingPreview() = PreviewChat(
     ChatUiState(isInitialLoading = false, isAwaitingReply = true, dialect = "Northern")
 )
+
+@Preview(name = "Loading · light", showBackground = true, widthDp = 412, heightDp = 892)
+@Composable
+private fun ChatScreenLoadingPreview() = PreviewChat(ChatUiState(isInitialLoading = true))
+
+@Preview(
+    name = "Loading · dark",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 892,
+    uiMode = UI_MODE_NIGHT_YES
+)
+@Composable
+private fun ChatScreenLoadingDarkPreview() =
+    PreviewChat(ChatUiState(isInitialLoading = true), darkTheme = true)
