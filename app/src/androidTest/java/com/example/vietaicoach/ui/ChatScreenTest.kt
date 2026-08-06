@@ -9,6 +9,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
+import androidx.paging.LoadState
+import androidx.paging.LoadStates
 import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.vietaicoach.data.local.model.ChatMessageEntity
@@ -20,6 +22,12 @@ import kotlinx.coroutines.flow.flowOf
 import org.junit.Rule
 import org.junit.Test
 
+private val SettledLoadStates = LoadStates(
+    refresh = LoadState.NotLoading(endOfPaginationReached = true),
+    prepend = LoadState.NotLoading(endOfPaginationReached = true),
+    append = LoadState.NotLoading(endOfPaginationReached = true)
+)
+
 class ChatScreenTest {
 
     @get:Rule
@@ -29,16 +37,20 @@ class ChatScreenTest {
         promptState: TextFieldState = TextFieldState(),
         uiState: ChatUiState = ChatUiState(isInitialLoading = false),
         vararg messages: ChatMessageEntity,
-        onSubmitMessage: () -> Unit = {}
+        onSubmitMessage: () -> Unit = {},
+        onMessagesLoaded: () -> Unit = {}
     ) {
-        val flow = flowOf(PagingData.from(messages.toList()))
+        // Explicit load states matter: PagingData.from(list) alone leaves refresh stuck in
+        // Loading, so the screen would never see paging settle.
+        val flow = flowOf(PagingData.from(messages.toList(), SettledLoadStates))
         composeTestRule.setContent {
             VietAICoachTheme {
                 ChatScreen(
                     promptState = promptState,
                     uiState = uiState,
                     messages = flow.collectAsLazyPagingItems(),
-                    onSubmitMessage = onSubmitMessage
+                    onSubmitMessage = onSubmitMessage,
+                    onMessagesLoaded = onMessagesLoaded
                 )
             }
         }
@@ -249,5 +261,52 @@ class ChatScreenTest {
         composeTestRule.onNodeWithTag("SendButton").performClick()
 
         composeTestRule.onNodeWithText("Message 30").assertIsDisplayed()
+    }
+
+    @Test
+    fun displaysTheSkeletonInsteadOfTheMessageListWhileLoading() {
+        setChatScreen(uiState = ChatUiState(isInitialLoading = true))
+
+        composeTestRule.onNodeWithTag("MessageListSkeleton").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("MessageList").assertDoesNotExist()
+    }
+
+    @Test
+    fun displaysTheComposerPlaceholderInsteadOfTheRealComposerWhileLoading() {
+        setChatScreen(uiState = ChatUiState(isInitialLoading = true))
+
+        composeTestRule.onNodeWithTag("ComposerSkeleton").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("PromptField").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("SendButton").assertDoesNotExist()
+    }
+
+    @Test
+    fun headerReportsLoadingInsteadOfTheDialectWhileLoading() {
+        setChatScreen(uiState = ChatUiState(isInitialLoading = true, dialect = "Northern"))
+
+        composeTestRule.onNodeWithText("Loading conversation\u2026").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Practicing \u00b7 Northern dialect").assertDoesNotExist()
+    }
+
+    @Test
+    fun swapsTheSkeletonForTheMessageListOnceLoadingFinishes() {
+        setChatScreen(
+            uiState = ChatUiState(isInitialLoading = false),
+            messages = arrayOf(
+                ChatMessageEntity(id = 1, role = ChatRole.USER, content = "Xin ch\u00e0o", timestamp = 1L)
+            )
+        )
+
+        composeTestRule.onNodeWithTag("MessageListSkeleton").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("MessageList").assertIsDisplayed()
+    }
+
+    @Test
+    fun reportsMessagesLoadedOncePagingSettles() {
+        var loaded = false
+        setChatScreen(onMessagesLoaded = { loaded = true })
+
+        // Paging has to emit and the effect has to run, neither of which is done at first idle.
+        composeTestRule.waitUntil(timeoutMillis = 5_000) { loaded }
     }
 }
