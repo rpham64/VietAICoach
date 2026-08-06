@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      values/themes.xml parents Theme.VietAICoach off the *Light* framework theme. Only
+      windowBackground is night-aware (via values-night/colors.xml), so in dark mode the window
+      and system decor still inherited light framework attributes. This flips the parent so the
+      pre-Compose frame and the system decor agree with the charcoal palette.
+    -->
+    <style name="Theme.VietAICoach" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+</resources>
