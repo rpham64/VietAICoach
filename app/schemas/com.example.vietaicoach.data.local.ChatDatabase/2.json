@@ -1,0 +1,81 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "401ca5649e61b19ef836bc17279c2b9e",
+    "entities": [
+      {
+        "tableName": "chat_messages",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `role` TEXT NOT NULL, `content` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `deliveryStatus` TEXT NOT NULL, `romanization` TEXT, `correctionOriginal` TEXT, `correctionFixed` TEXT, `correctionExplanation` TEXT, `isPraise` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "role",
+            "columnName": "role",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deliveryStatus",
+            "columnName": "deliveryStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "romanization",
+            "columnName": "romanization",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "correctionOriginal",
+            "columnName": "correctionOriginal",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "correctionFixed",
+            "columnName": "correctionFixed",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "correctionExplanation",
+            "columnName": "correctionExplanation",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isPraise",
+            "columnName": "isPraise",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '401ca5649e61b19ef836bc17279c2b9e')"
+    ]
+  }
+}

@@ -22,7 +22,9 @@ object DatabaseModule {
             context,
             ChatDatabase::class.java,
             "chat_database"
-        ).build()
+        )
+            .addMigrations(ChatDatabase.MIGRATION_1_2)
+            .build()
     }
 
     @Singleton

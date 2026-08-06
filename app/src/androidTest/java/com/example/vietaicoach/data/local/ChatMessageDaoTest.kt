@@ -6,9 +6,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.vietaicoach.data.local.model.ChatMessageEntity
 import com.example.vietaicoach.data.local.model.ChatRole
+import com.example.vietaicoach.data.local.model.DeliveryStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -94,5 +96,76 @@ class ChatMessageDaoTest {
         dao.clearAll()
 
         assertTrue(loadAll().isEmpty())
+    }
+
+    @Test
+    fun insertDefaultsDeliveryStatusToSent() = runBlocking {
+        val id = dao.insert(ChatMessageEntity(role = ChatRole.USER, content = "Hello", timestamp = 1L))
+
+        assertEquals(DeliveryStatus.SENT, dao.getById(id)?.deliveryStatus)
+    }
+
+    @Test
+    fun insertRoundTripsCoachingAnnotations() = runBlocking {
+        val id = dao.insert(
+            ChatMessageEntity(
+                role = ChatRole.ASSISTANT,
+                content = "Giỏi lắm!",
+                timestamp = 1L,
+                romanization = "Well done!",
+                correctionOriginal = "đi đến chợ",
+                correctionFixed = "đã đi đến chợ",
+                correctionExplanation = "Add đã to mark the past tense.",
+                isPraise = true
+            )
+        )
+
+        val stored = dao.getById(id)!!
+
+        assertEquals("Well done!", stored.romanization)
+        assertEquals("đi đến chợ", stored.correctionOriginal)
+        assertEquals("đã đi đến chợ", stored.correctionFixed)
+        assertEquals("Add đã to mark the past tense.", stored.correctionExplanation)
+        assertTrue(stored.isPraise)
+    }
+
+    @Test
+    fun getByIdReturnsNullForAnUnknownId() = runBlocking {
+        assertNull(dao.getById(404L))
+    }
+
+    @Test
+    fun countReflectsTheNumberOfStoredMessages() = runBlocking {
+        assertEquals(0, dao.count())
+
+        dao.insert(ChatMessageEntity(role = ChatRole.USER, content = "Hello", timestamp = 1L))
+        dao.insert(ChatMessageEntity(role = ChatRole.ASSISTANT, content = "Hi!", timestamp = 2L))
+
+        assertEquals(2, dao.count())
+    }
+
+    @Test
+    fun updateDeliveryStatusChangesOnlyTheTargetedMessage() = runBlocking {
+        val first = dao.insert(
+            ChatMessageEntity(
+                role = ChatRole.USER,
+                content = "First",
+                timestamp = 1L,
+                deliveryStatus = DeliveryStatus.SENDING
+            )
+        )
+        val second = dao.insert(
+            ChatMessageEntity(
+                role = ChatRole.USER,
+                content = "Second",
+                timestamp = 2L,
+                deliveryStatus = DeliveryStatus.SENDING
+            )
+        )
+
+        dao.updateDeliveryStatus(first, DeliveryStatus.FAILED)
+
+        assertEquals(DeliveryStatus.FAILED, dao.getById(first)?.deliveryStatus)
+        assertEquals(DeliveryStatus.SENDING, dao.getById(second)?.deliveryStatus)
     }
 }
