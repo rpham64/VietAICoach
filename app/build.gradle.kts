@@ -65,7 +65,6 @@ dependencies {
     // Networking
     implementation(libs.retrofit.core)
     implementation(libs.retrofit.kotlinx.serialization.converter)
-    implementation(libs.retrofit.converter.gson)
     implementation(libs.kotlinx.serialization.json)
 
     // Room
