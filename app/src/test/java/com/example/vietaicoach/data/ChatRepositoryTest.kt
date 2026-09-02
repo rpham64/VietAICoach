@@ -8,6 +8,7 @@ import com.example.vietaicoach.data.local.model.ChatMessageEntity
 import com.example.vietaicoach.data.local.model.ChatRole
 import com.example.vietaicoach.data.local.model.DeliveryStatus
 import com.example.vietaicoach.data.remote.ChatRemoteDataSource
+import com.example.vietaicoach.data.remote.model.ChatResponse
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -27,8 +28,9 @@ class ChatRepositoryTest {
     @Test
     fun `submitMessage saves the user message before calling the remote data source`() = runTest {
         coEvery { localDataSource.saveUserMessage(any(), any()) } returns 1L
-        coEvery { localDataSource.saveAssistantMessage(any()) } returns 2L
-        coEvery { remoteDataSource.submitMessage("Hello") } returns Result.success("Hi!")
+        coEvery { localDataSource.saveAssistantMessage(any(), any(), any(), any(), any(), any()) } returns 2L
+        coEvery { remoteDataSource.submitMessage("Hello") } returns
+            Result.success(ChatResponse(response = "Hi!"))
 
         repository.submitMessage("Hello")
 
@@ -41,14 +43,45 @@ class ChatRepositoryTest {
     @Test
     fun `submitMessage saves and returns the assistant response on success`() = runTest {
         coEvery { localDataSource.saveUserMessage(any(), any()) } returns 1L
-        coEvery { localDataSource.saveAssistantMessage(any()) } returns 2L
-        coEvery { remoteDataSource.submitMessage("Hello") } returns Result.success("Hi!")
+        coEvery { localDataSource.saveAssistantMessage(any(), any(), any(), any(), any(), any()) } returns 2L
+        coEvery { remoteDataSource.submitMessage("Hello") } returns
+            Result.success(ChatResponse(response = "Hi!"))
 
         val result = repository.submitMessage("Hello")
 
         assertTrue(result.isSuccess)
         assertEquals("Hi!", result.getOrNull())
-        coVerify { localDataSource.saveAssistantMessage("Hi!") }
+        coVerify { localDataSource.saveAssistantMessage("Hi!", null, null, null, null, false) }
+    }
+
+    @Test
+    fun `submitMessage persists the coaching annotations that came back with the reply`() = runTest {
+        coEvery { localDataSource.saveUserMessage(any(), any()) } returns 1L
+        coEvery { localDataSource.saveAssistantMessage(any(), any(), any(), any(), any(), any()) } returns 2L
+        coEvery { remoteDataSource.submitMessage("Hello") } returns Result.success(
+            ChatResponse(
+                response = "Giỏi lắm!",
+                romanization = "Well done!",
+                correctionOriginal = "đi đến chợ",
+                correctionFixed = "đã đi đến chợ",
+                correctionExplanation = "Add đã to mark the past tense.",
+                isCorrect = true
+            )
+        )
+
+        val result = repository.submitMessage("Hello")
+
+        assertEquals("Giỏi lắm!", result.getOrNull())
+        coVerify {
+            localDataSource.saveAssistantMessage(
+                "Giỏi lắm!",
+                "Well done!",
+                "đi đến chợ",
+                "đã đi đến chợ",
+                "Add đã to mark the past tense.",
+                true
+            )
+        }
     }
 
     @Test
@@ -62,7 +95,9 @@ class ChatRepositoryTest {
         assertTrue(result.isFailure)
         assertEquals(error, result.exceptionOrNull())
         coVerify(exactly = 1) { localDataSource.saveUserMessage(any(), any()) }
-        coVerify(exactly = 0) { localDataSource.saveAssistantMessage(any()) }
+        coVerify(exactly = 0) {
+            localDataSource.saveAssistantMessage(any(), any(), any(), any(), any(), any())
+        }
     }
 
     @Test

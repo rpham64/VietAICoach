@@ -22,9 +22,18 @@ class ChatRepositoryImpl @Inject constructor(
     override suspend fun submitMessage(message: String): Result<String> {
         localDataSource.saveUserMessage(message, DeliveryStatus.SENT)
 
-        return remoteDataSource.submitMessage(message).onSuccess { response ->
-            localDataSource.saveAssistantMessage(response)
-        }
+        return remoteDataSource.submitMessage(message)
+            .onSuccess { reply ->
+                localDataSource.saveAssistantMessage(
+                    content = reply.response,
+                    romanization = reply.romanization,
+                    correctionOriginal = reply.correctionOriginal,
+                    correctionFixed = reply.correctionFixed,
+                    correctionExplanation = reply.correctionExplanation,
+                    isPraise = reply.isCorrect
+                )
+            }
+            .map { it.response }
     }
 
     override fun getMessages(): Flow<PagingData<ChatMessageEntity>> {
