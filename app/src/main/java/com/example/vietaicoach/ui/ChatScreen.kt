@@ -1,6 +1,5 @@
 package com.example.vietaicoach.ui
 
-import android.content.ClipData
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -29,11 +28,9 @@ import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -45,8 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -58,7 +53,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.example.vietaicoach.data.local.model.ChatMessageEntity
 import com.example.vietaicoach.data.local.model.ChatRole
-import com.example.vietaicoach.ui.model.ResponseState
+import com.example.vietaicoach.ui.model.ChatUiState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -68,13 +63,13 @@ fun ChatScreen(
     modifier: Modifier = Modifier,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
-    val responseState by viewModel.responseStateFlow.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val messages = viewModel.messages.collectAsLazyPagingItems()
 
     ChatScreen(
         promptState = viewModel.promptState,
         onClearClicked = { viewModel.promptState.clearText() },
-        responseState = responseState,
+        uiState = uiState,
         messages = messages,
         onSubmitButtonClicked = { viewModel.submitMessage(viewModel.promptState.text.toString()) },
         modifier = modifier
@@ -85,7 +80,7 @@ fun ChatScreen(
 fun ChatScreen(
     promptState: TextFieldState,
     onClearClicked: () -> Unit,
-    responseState: ResponseState,
+    uiState: ChatUiState,
     messages: LazyPagingItems<ChatMessageEntity>,
     onSubmitButtonClicked: () -> Unit,
     modifier: Modifier = Modifier
@@ -103,19 +98,9 @@ fun ChatScreen(
         ) {
             MessageList(
                 messages = messages,
-                isAssistantTyping = responseState.isLoading,
+                isAssistantTyping = uiState.isAwaitingReply,
                 listState = listState,
                 modifier = Modifier.fillMaxSize()
-            )
-            if (responseState.errorMessage != null) {
-                ErrorBanner(
-                    errorMessage = responseState.errorMessage,
-                    modifier = Modifier.align(Alignment.TopCenter)
-                )
-            }
-            CopyButton(
-                responseState = responseState,
-                modifier = Modifier.align(Alignment.BottomEnd)
             )
         }
         Row(
@@ -141,7 +126,7 @@ fun ChatScreen(
                     .clip(RoundedCornerShape(16.dp))
             )
             SubmitButton(
-                isLoading = responseState.isLoading,
+                isLoading = uiState.isAwaitingReply,
                 onSubmitButtonClicked = {
                     onSubmitButtonClicked()
                     coroutineScope.launch { listState.animateScrollToItem(0) }
@@ -244,51 +229,6 @@ fun TypingIndicator(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ErrorBanner(
-    errorMessage: String,
-    modifier: Modifier = Modifier
-) {
-    Text(
-        text = errorMessage,
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(16.dp)
-    )
-}
-
-@Composable
-fun CopyButton(
-    responseState: ResponseState,
-    modifier: Modifier = Modifier
-) {
-    val coroutineScope = rememberCoroutineScope()
-    val clipboard = LocalClipboard.current
-
-    IconButton(
-        onClick = {
-            coroutineScope.launch {
-                clipboard.setClipEntry(
-                    ClipEntry(
-                        ClipData.newPlainText(
-                            "response",
-                            responseState.errorMessage ?: responseState.response
-                        )
-                    )
-                )
-            }
-        },
-        modifier = modifier.padding(8.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Default.ContentCopy,
-            contentDescription = "Copy response",
-        )
-    }
-}
-
-@Composable
 fun SubmitButton(
     isLoading: Boolean,
     onSubmitButtonClicked: () -> Unit,
@@ -330,7 +270,7 @@ fun ChatScreenPreview() {
     ChatScreen(
         promptState = rememberTextFieldState(initialText = "This is a test prompt"),
         onClearClicked = { },
-        responseState = ResponseState("Hello!"),
+        uiState = ChatUiState(isInitialLoading = false),
         messages = previewMessages.collectAsLazyPagingItems(),
         onSubmitButtonClicked = { }
     )
@@ -350,7 +290,7 @@ fun ChatScreenTypingIndicatorPreview() {
     ChatScreen(
         promptState = rememberTextFieldState(),
         onClearClicked = { },
-        responseState = ResponseState(isLoading = true),
+        uiState = ChatUiState(isInitialLoading = false, isAwaitingReply = true),
         messages = previewMessages.collectAsLazyPagingItems(),
         onSubmitButtonClicked = { }
     )
