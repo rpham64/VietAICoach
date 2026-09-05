@@ -38,6 +38,7 @@ class ChatScreenTest {
         uiState: ChatUiState = ChatUiState(isInitialLoading = false),
         vararg messages: ChatMessageEntity,
         onSubmitMessage: () -> Unit = {},
+        onRetryMessage: (Long) -> Unit = {},
         onMessagesLoaded: () -> Unit = {}
     ) {
         // Explicit load states matter: PagingData.from(list) alone leaves refresh stuck in
@@ -50,6 +51,7 @@ class ChatScreenTest {
                     uiState = uiState,
                     messages = flow.collectAsLazyPagingItems(),
                     onSubmitMessage = onSubmitMessage,
+                    onRetryMessage = onRetryMessage,
                     onMessagesLoaded = onMessagesLoaded
                 )
             }
@@ -308,5 +310,67 @@ class ChatScreenTest {
 
         // Paging has to emit and the effect has to run, neither of which is done at first idle.
         composeTestRule.waitUntil(timeoutMillis = 5_000) { loaded }
+    }
+
+    @Test
+    fun failedMessagesOfferARetryAffordance() {
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(
+                    id = 1,
+                    role = ChatRole.USER,
+                    content = "Xin ch\u00e0o",
+                    timestamp = 1L,
+                    deliveryStatus = DeliveryStatus.FAILED
+                )
+            )
+        )
+
+        composeTestRule.onNodeWithTag("RetryMessageButton").assertIsDisplayed()
+    }
+
+    @Test
+    fun retryIsOfferedOnlyForMessagesThatActuallyFailed() {
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(
+                    id = 1,
+                    role = ChatRole.USER,
+                    content = "Xin ch\u00e0o",
+                    timestamp = 1L,
+                    deliveryStatus = DeliveryStatus.SENT
+                ),
+                ChatMessageEntity(
+                    id = 2,
+                    role = ChatRole.USER,
+                    content = "T\u00f4i mu\u1ed1n \u0111\u1eb7t b\u00e0n.",
+                    timestamp = 2L,
+                    deliveryStatus = DeliveryStatus.SENDING
+                )
+            )
+        )
+
+        composeTestRule.onNodeWithTag("RetryMessageButton").assertDoesNotExist()
+    }
+
+    @Test
+    fun retryClickReportsTheIdOfTheFailedMessage() {
+        var retried: Long? = null
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(
+                    id = 42,
+                    role = ChatRole.USER,
+                    content = "Xin ch\u00e0o",
+                    timestamp = 1L,
+                    deliveryStatus = DeliveryStatus.FAILED
+                )
+            ),
+            onRetryMessage = { retried = it }
+        )
+
+        composeTestRule.onNodeWithTag("RetryMessageButton").performClick()
+
+        composeTestRule.runOnIdle { assert(retried == 42L) }
     }
 }

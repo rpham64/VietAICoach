@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -103,6 +104,7 @@ fun ChatScreen(
         uiState = uiState,
         messages = messages,
         onSubmitMessage = { viewModel.submitMessage(viewModel.promptState.text.toString()) },
+        onRetryMessage = viewModel::retryMessage,
         onMessagesLoaded = viewModel::onMessagesLoaded,
         modifier = modifier
     )
@@ -114,6 +116,7 @@ fun ChatScreen(
     uiState: ChatUiState,
     messages: LazyPagingItems<ChatMessageEntity>,
     onSubmitMessage: () -> Unit,
+    onRetryMessage: (Long) -> Unit,
     onMessagesLoaded: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -148,6 +151,7 @@ fun ChatScreen(
             MessageList(
                 messages = messages,
                 isAssistantTyping = uiState.isAwaitingReply,
+                onRetryMessage = onRetryMessage,
                 listState = listState,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -225,6 +229,7 @@ private fun ChatHeader(
 fun MessageList(
     messages: LazyPagingItems<ChatMessageEntity>,
     isAssistantTyping: Boolean,
+    onRetryMessage: (Long) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState()
 ) {
@@ -245,7 +250,11 @@ fun MessageList(
             key = messages.itemKey { it.id }
         ) { index ->
             messages[index]?.let { message ->
-                MessageBubble(message = message, modifier = Modifier.fillMaxWidth())
+                MessageBubble(
+                    message = message,
+                    onRetry = { onRetryMessage(message.id) },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
@@ -259,12 +268,14 @@ fun MessageList(
 @Composable
 fun MessageBubble(
     message: ChatMessageEntity,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         if (message.role == ChatRole.USER) {
             UserMessage(
                 message = message,
+                onRetry = onRetry,
                 maxBubbleWidth = maxWidth * USER_BUBBLE_MAX_WIDTH
             )
         } else {
@@ -279,10 +290,13 @@ fun MessageBubble(
 @Composable
 private fun UserMessage(
     message: ChatMessageEntity,
+    onRetry: () -> Unit,
     maxBubbleWidth: Dp,
     modifier: Modifier = Modifier
 ) {
     val coach = LocalCoachColors.current
+    // A message that has not landed is desaturated, so the list reads at a glance.
+    val isSettled = message.deliveryStatus == DeliveryStatus.SENT
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -296,12 +310,11 @@ private fun UserMessage(
             modifier = Modifier
                 .widthIn(max = maxBubbleWidth)
                 .clip(UserBubbleShape)
-                .background(MaterialTheme.colorScheme.primary)
+                .background(
+                    if (isSettled) MaterialTheme.colorScheme.primary else coach.bubblePending
+                )
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         )
-        // The failed variant — desaturated bubble plus a Retry link — is the error state, and
-        // lands with the rest of it. Reporting the status honestly here beats hardcoding
-        // "Delivered" onto a message that is still in flight.
         when (message.deliveryStatus) {
             DeliveryStatus.SENT -> Text(
                 text = "✓ Delivered",
@@ -315,11 +328,26 @@ private fun UserMessage(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            DeliveryStatus.FAILED -> Text(
-                text = "⚠ Not delivered",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.error
-            )
+            DeliveryStatus.FAILED -> Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "⚠ Not delivered",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = "Retry",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    textDecoration = TextDecoration.Underline,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .testTag("RetryMessageButton")
+                        .clickable(onClick = onRetry)
+                )
+            }
         }
     }
 }
@@ -708,6 +736,7 @@ private fun PreviewChat(
             uiState = uiState,
             messages = flow.collectAsLazyPagingItems(),
             onSubmitMessage = { },
+            onRetryMessage = { },
             onMessagesLoaded = { }
         )
     }
@@ -749,3 +778,29 @@ private fun ChatScreenLoadingPreview() = PreviewChat(ChatUiState(isInitialLoadin
 @Composable
 private fun ChatScreenLoadingDarkPreview() =
     PreviewChat(ChatUiState(isInitialLoading = true), darkTheme = true)
+
+private val failedConversation = listOf(
+    sampleMessages[1].copy(deliveryStatus = DeliveryStatus.FAILED),
+    sampleMessages[2]
+)
+
+@Preview(name = "Error · light", showBackground = true, widthDp = 412, heightDp = 892)
+@Composable
+private fun ChatScreenErrorPreview() = PreviewChat(
+    uiState = ChatUiState(isInitialLoading = false, dialect = "Northern"),
+    messages = failedConversation
+)
+
+@Preview(
+    name = "Error · dark",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 892,
+    uiMode = UI_MODE_NIGHT_YES
+)
+@Composable
+private fun ChatScreenErrorDarkPreview() = PreviewChat(
+    uiState = ChatUiState(isInitialLoading = false, dialect = "Northern"),
+    messages = failedConversation,
+    darkTheme = true
+)
