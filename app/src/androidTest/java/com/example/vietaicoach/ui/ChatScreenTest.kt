@@ -1,12 +1,9 @@
 package com.example.vietaicoach.ui
 
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.clearText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
-import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -16,7 +13,9 @@ import androidx.paging.PagingData
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.vietaicoach.data.local.model.ChatMessageEntity
 import com.example.vietaicoach.data.local.model.ChatRole
+import com.example.vietaicoach.data.local.model.DeliveryStatus
 import com.example.vietaicoach.ui.model.ChatUiState
+import com.example.vietaicoach.ui.theme.VietAICoachTheme
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Rule
 import org.junit.Test
@@ -26,149 +25,229 @@ class ChatScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    private fun pagingItemsOf(vararg messages: ChatMessageEntity) =
-        flowOf(PagingData.from(messages.toList()))
+    private fun setChatScreen(
+        promptState: TextFieldState = TextFieldState(),
+        uiState: ChatUiState = ChatUiState(isInitialLoading = false),
+        vararg messages: ChatMessageEntity,
+        onSubmitMessage: () -> Unit = {}
+    ) {
+        val flow = flowOf(PagingData.from(messages.toList()))
+        composeTestRule.setContent {
+            VietAICoachTheme {
+                ChatScreen(
+                    promptState = promptState,
+                    uiState = uiState,
+                    messages = flow.collectAsLazyPagingItems(),
+                    onSubmitMessage = onSubmitMessage
+                )
+            }
+        }
+    }
 
     @Test
     fun displaysUserAndAssistantMessageBubbles() {
-        composeTestRule.setContent {
-            ChatScreen(
-                promptState = TextFieldState(),
-                onClearClicked = {},
-                uiState = ChatUiState(isInitialLoading = false),
-                messages = pagingItemsOf(
-                    ChatMessageEntity(id = 1, role = ChatRole.USER, content = "Hi there", timestamp = 1L),
-                    ChatMessageEntity(id = 2, role = ChatRole.ASSISTANT, content = "Hello!", timestamp = 2L)
-                ).collectAsLazyPagingItems(),
-                onSubmitButtonClicked = {}
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(id = 1, role = ChatRole.USER, content = "Hi there", timestamp = 1L),
+                ChatMessageEntity(id = 2, role = ChatRole.ASSISTANT, content = "Hello!", timestamp = 2L)
             )
-        }
+        )
 
         composeTestRule.onNodeWithText("Hi there").assertIsDisplayed()
         composeTestRule.onNodeWithText("Hello!").assertIsDisplayed()
     }
 
     @Test
-    fun submitButtonClickInvokesCallback() {
-        var submitted = false
-        composeTestRule.setContent {
-            ChatScreen(
-                promptState = TextFieldState(),
-                onClearClicked = {},
-                uiState = ChatUiState(isInitialLoading = false),
-                messages = pagingItemsOf().collectAsLazyPagingItems(),
-                onSubmitButtonClicked = { submitted = true }
-            )
-        }
+    fun displaysTheBrandedHeaderWithTheActiveDialect() {
+        setChatScreen(uiState = ChatUiState(isInitialLoading = false, dialect = "Northern"))
 
-        composeTestRule.onNodeWithText("Submit").performClick()
+        composeTestRule.onNodeWithText("Chào Bạn").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Practicing · Northern dialect").assertIsDisplayed()
+    }
+
+    @Test
+    fun displaysTheRomanizationGlossBeneathAnAssistantMessage() {
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(
+                    id = 1,
+                    role = ChatRole.ASSISTANT,
+                    content = "Hãy thử nói một câu bằng tiếng Việt nhé.",
+                    timestamp = 1L,
+                    romanization = "Try saying a sentence in Vietnamese."
+                )
+            )
+        )
+
+        composeTestRule.onNodeWithText("Try saying a sentence in Vietnamese.").assertIsDisplayed()
+    }
+
+    @Test
+    fun displaysThePraiseLabelOnlyWhenTheCoachConfirmedTheSentence() {
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(
+                    id = 1,
+                    role = ChatRole.ASSISTANT,
+                    content = "Giỏi lắm!",
+                    timestamp = 1L,
+                    isPraise = true
+                )
+            )
+        )
+
+        composeTestRule.onNodeWithText("PERFECT!").assertIsDisplayed()
+    }
+
+    @Test
+    fun doesNotDisplayThePraiseLabelOnAnOrdinaryReply() {
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(id = 1, role = ChatRole.ASSISTANT, content = "Xin chào", timestamp = 1L)
+            )
+        )
+
+        composeTestRule.onNodeWithText("PERFECT!").assertDoesNotExist()
+    }
+
+    @Test
+    fun doesNotDisplayACopyActionOnUserMessages() {
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(id = 1, role = ChatRole.USER, content = "Xin chào", timestamp = 1L)
+            )
+        )
+
+        composeTestRule.onNodeWithTag("CopyResponseButton").assertDoesNotExist()
+    }
+
+    @Test
+    fun displaysACopyActionOnAssistantMessages() {
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(id = 1, role = ChatRole.ASSISTANT, content = "Xin chào", timestamp = 1L)
+            )
+        )
+
+        composeTestRule.onNodeWithTag("CopyResponseButton").assertIsDisplayed()
+    }
+
+    @Test
+    fun inFlightMessagesAreNotReportedAsDelivered() {
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(
+                    id = 1,
+                    role = ChatRole.USER,
+                    content = "Xin chào",
+                    timestamp = 1L,
+                    deliveryStatus = DeliveryStatus.SENDING
+                )
+            )
+        )
+
+        composeTestRule.onNodeWithText("Sending…").assertIsDisplayed()
+        composeTestRule.onNodeWithText("✓ Delivered").assertDoesNotExist()
+    }
+
+    @Test
+    fun deliveredMessagesAreMarkedAsSuch() {
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(
+                    id = 1,
+                    role = ChatRole.USER,
+                    content = "Xin chào",
+                    timestamp = 1L,
+                    deliveryStatus = DeliveryStatus.SENT
+                )
+            )
+        )
+
+        composeTestRule.onNodeWithText("✓ Delivered").assertIsDisplayed()
+    }
+
+    @Test
+    fun failedMessagesAreMarkedAsNotDelivered() {
+        setChatScreen(
+            messages = arrayOf(
+                ChatMessageEntity(
+                    id = 1,
+                    role = ChatRole.USER,
+                    content = "Xin chào",
+                    timestamp = 1L,
+                    deliveryStatus = DeliveryStatus.FAILED
+                )
+            )
+        )
+
+        composeTestRule.onNodeWithText("⚠ Not delivered").assertIsDisplayed()
+    }
+
+    @Test
+    fun sendButtonClickInvokesCallback() {
+        var submitted = false
+        setChatScreen(onSubmitMessage = { submitted = true })
+
+        composeTestRule.onNodeWithTag("SendButton").performClick()
 
         assert(submitted)
     }
 
     @Test
-    fun submitButtonShowsLoadingIndicatorInsteadOfLabelWhenLoading() {
-        composeTestRule.setContent {
-            ChatScreen(
-                promptState = TextFieldState(),
-                onClearClicked = {},
-                uiState = ChatUiState(isInitialLoading = false, isAwaitingReply = true),
-                messages = pagingItemsOf().collectAsLazyPagingItems(),
-                onSubmitButtonClicked = {}
-            )
-        }
-
-        composeTestRule.onNodeWithText("Submit").assertDoesNotExist()
-        composeTestRule.onNodeWithTag("SubmitButtonLoadingIndicator").assertIsDisplayed()
-    }
-
-    @Test
     fun displaysTypingIndicatorWhileWaitingForAResponse() {
-        composeTestRule.setContent {
-            ChatScreen(
-                promptState = TextFieldState(),
-                onClearClicked = {},
-                uiState = ChatUiState(isInitialLoading = false, isAwaitingReply = true),
-                messages = pagingItemsOf().collectAsLazyPagingItems(),
-                onSubmitButtonClicked = {}
-            )
-        }
+        setChatScreen(uiState = ChatUiState(isInitialLoading = false, isAwaitingReply = true))
 
         composeTestRule.onNodeWithTag("TypingIndicator").assertIsDisplayed()
     }
 
     @Test
     fun doesNotDisplayTypingIndicatorWhenNotLoading() {
-        composeTestRule.setContent {
-            ChatScreen(
-                promptState = TextFieldState(),
-                onClearClicked = {},
-                uiState = ChatUiState(isInitialLoading = false),
-                messages = pagingItemsOf().collectAsLazyPagingItems(),
-                onSubmitButtonClicked = {}
-            )
-        }
+        setChatScreen()
 
         composeTestRule.onNodeWithTag("TypingIndicator").assertDoesNotExist()
     }
 
     @Test
-    fun clearIconClickInvokesCallback() {
-        val promptState = TextFieldState(initialText = "Hello")
-        composeTestRule.setContent {
-            ChatScreen(
-                promptState = promptState,
-                onClearClicked = { promptState.clearText() },
-                uiState = ChatUiState(isInitialLoading = false),
-                messages = pagingItemsOf().collectAsLazyPagingItems(),
-                onSubmitButtonClicked = {}
-            )
-        }
+    fun clearAffordanceAppearsOnlyOnceThePromptHasText() {
+        setChatScreen(promptState = TextFieldState())
 
-        composeTestRule.onNodeWithContentDescription("Clear prompt").performClick()
-
-        assert(promptState.text.isEmpty())
+        composeTestRule.onNodeWithTag("ClearPromptButton").assertDoesNotExist()
     }
 
     @Test
-    fun submitButtonClickScrollsChatBackToTheBottom() {
-        val messages = (30 downTo 1).map { i ->
-            ChatMessageEntity(id = i.toLong(), role = ChatRole.USER, content = "Message $i", timestamp = i.toLong())
-        }.toTypedArray()
+    fun clearAffordanceClickEmptiesThePrompt() {
+        val promptState = TextFieldState(initialText = "Hello")
+        setChatScreen(promptState = promptState)
 
-        composeTestRule.setContent {
-            ChatScreen(
-                promptState = TextFieldState(),
-                onClearClicked = {},
-                uiState = ChatUiState(isInitialLoading = false),
-                messages = pagingItemsOf(*messages).collectAsLazyPagingItems(),
-                onSubmitButtonClicked = {}
-            )
-        }
+        composeTestRule.onNodeWithTag("ClearPromptButton").performClick()
 
-        composeTestRule.onNodeWithTag("MessageList").performScrollToIndex(25)
-        composeTestRule.onNodeWithText("Message 30").assertIsNotDisplayed()
-
-        composeTestRule.onNodeWithText("Submit").performClick()
-
-        composeTestRule.onNodeWithText("Message 30").assertIsDisplayed()
+        composeTestRule.runOnIdle { assert(promptState.text.isEmpty()) }
     }
 
     @Test
     fun typingIntoPromptFieldUpdatesPromptState() {
         val promptState = TextFieldState()
-        composeTestRule.setContent {
-            ChatScreen(
-                promptState = promptState,
-                onClearClicked = {},
-                uiState = ChatUiState(isInitialLoading = false),
-                messages = pagingItemsOf().collectAsLazyPagingItems(),
-                onSubmitButtonClicked = {}
-            )
-        }
+        setChatScreen(promptState = promptState)
 
-        composeTestRule.onNode(hasSetTextAction()).performTextInput("Hello")
+        composeTestRule.onNodeWithTag("PromptField").performTextInput("Hello")
 
-        assert(promptState.text.toString() == "Hello")
+        composeTestRule.runOnIdle { assert(promptState.text.toString() == "Hello") }
+    }
+
+    @Test
+    fun sendButtonClickScrollsChatBackToTheBottom() {
+        val messages = (30 downTo 1).map { i ->
+            ChatMessageEntity(id = i.toLong(), role = ChatRole.USER, content = "Message $i", timestamp = i.toLong())
+        }.toTypedArray()
+
+        setChatScreen(messages = messages)
+
+        composeTestRule.onNodeWithTag("MessageList").performScrollToIndex(25)
+        composeTestRule.onNodeWithText("Message 30").assertIsNotDisplayed()
+
+        composeTestRule.onNodeWithTag("SendButton").performClick()
+
+        composeTestRule.onNodeWithText("Message 30").assertIsDisplayed()
     }
 }
